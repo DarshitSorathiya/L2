@@ -1,0 +1,1 @@
+"""Merge Wars GitHub assistant."""

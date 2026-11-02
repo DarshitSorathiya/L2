@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+
+# Environments
+.venv/
+venv/
+.env
+*.env
+.env.*
+!.env.example
+
+# IDE/Editor
+.idea/
+.vscode/
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+ai_mlc/.env

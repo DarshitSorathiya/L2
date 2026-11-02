@@ -189,6 +189,25 @@ class AgentTests(unittest.TestCase):
             agent_fetch(fake_agent, "question", max_retries=3)
         self.assertEqual(fake_agent.calls, 1)
 
+    def test_agent_explains_gemini_billing_failure_without_retries(self) -> None:
+        class FailingAgent:
+            calls = 0
+
+            def run(self, messages: list[object]) -> dict[str, list[object]]:
+                self.calls += 1
+                raise RuntimeError(
+                    "403 PERMISSION_DENIED: The Gemini API free tier is not "
+                    "available for this project. status: project-unavailable"
+                )
+
+        fake_agent = FailingAgent()
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Enable Gemini API billing.*aistudio.google.com/billing.*GOOGLE_API_KEY",
+        ):
+            agent_fetch(fake_agent, "question", max_retries=3)
+        self.assertEqual(fake_agent.calls, 1)
+
     def test_agent_explains_unreachable_configured_mcp_without_retries(self) -> None:
         class GroupedError(RuntimeError):
             def __init__(self) -> None:

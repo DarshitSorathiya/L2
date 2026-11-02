@@ -93,6 +93,10 @@ The hosted GitHub MCP endpoint is used by default. To run the local MCP server t
 
 If the CLI reports that it cannot connect to `api.githubcopilot.com`, the hosted MCP server is unreachable from your current network. Check that outbound HTTPS is allowed and review any firewall or proxy settings. Alternatively, set `USE_DOCKER_MCP=true` in `.env` and run with Docker Desktop available; Docker must be able to access the GitHub MCP server image if it is not already present locally. Restart the CLI after changing `.env`.
 
+### If Gemini returns 403 `project-unavailable`
+
+The Google Cloud project associated with `GOOGLE_API_KEY` cannot use the Gemini API free tier. Enable Gemini API billing for that project in [Google AI Studio billing](https://aistudio.google.com/billing), or use an API key from a project with billing enabled. If billing is already enabled, verify that the key belongs to that project. This is separate from GitHub token permissions and MCP connectivity.
+
 ### Example requests
 
 - `List open issues in octocat/Hello-World`

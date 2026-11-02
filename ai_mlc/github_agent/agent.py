@@ -160,6 +160,14 @@ def _is_mcp_connection_failure(error: BaseException, mcp_url: str) -> bool:
     )
 
 
+def _is_gemini_billing_error(error: BaseException) -> bool:
+    message = " ".join(str(item) for item in _walk_errors(error)).casefold()
+    return (
+        "free tier is not available for this project" in message
+        or ("project-unavailable" in message and "403" in message)
+    )
+
+
 def agent_fetch(
     agent: Any,
     prompt: str,
@@ -205,6 +213,17 @@ def agent_fetch(
                     f"Details: {details}"
                 )
                 LOGGER.error("%s", message)
+                raise RuntimeError(message) from error
+            if _is_gemini_billing_error(error):
+                message = (
+                    "Gemini rejected the Google Cloud project associated with "
+                    "GOOGLE_API_KEY because Gemini API free-tier access is unavailable. "
+                    "Enable Gemini API billing for that project in Google AI Studio "
+                    "(https://aistudio.google.com/billing), or use an API key from a "
+                    "project with billing enabled. If billing is already enabled, verify "
+                    "that GOOGLE_API_KEY belongs to that project."
+                )
+                LOGGER.error("%s Details: %s", message, _error_details(error))
                 raise RuntimeError(message) from error
             if not _is_transient(error) or attempt >= retries:
                 details = _error_details(error)

@@ -322,7 +322,7 @@ def create_pull_request(
                 "Review or remove that branch before retrying."
             )
         repository.git.checkout("-b", branch_name, f"origin/{default_branch}")
-        repository.git.config("user.name", "Merge Wars AI")
+        repository.git.config("user.name", "Repo Guide AI")
         repository.git.config("user.email", "merge-wars-ai@users.noreply.github.com")
 
         root = Path(temporary_directory).resolve()

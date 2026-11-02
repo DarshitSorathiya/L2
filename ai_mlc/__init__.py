@@ -1,1 +1,1 @@
-"""Merge Wars GitHub assistant."""
+"""Repo Guide GitHub assistant."""

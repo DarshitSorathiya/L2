@@ -21,7 +21,7 @@ load_dotenv()
 configure_logging()
 log_event("Streamlit app started")
 st.set_page_config(
-    page_title="Merge Wars - GitHub AI Assistant", page_icon="🧠", layout="wide"
+    page_title="Repo Guide - GitHub AI Assistant", page_icon="🧠", layout="wide"
 )
 
 st.sidebar.header("Settings")
@@ -58,7 +58,7 @@ if (
         st.error(report_error("Assistant initialization failed", error))
         st.stop()
 
-st.title("Merge Wars: GitHub AI Brain — MCP + Gemini")
+st.title("Repo Guide: GitHub AI Brain — MCP")
 selected_repo = st.selectbox("Repository for proposed pull requests", repos)
 if st.button("Clear conversation history"):
     st.session_state.conversation_history = {}
@@ -355,7 +355,7 @@ if "fix_analysis" in st.session_state:
                             repo=selected_repo,
                             file_path=file_path,
                             new_content=new_content,
-                            title="Suggested fix from Merge Wars",
+                            title="Suggested fix from Repo Guide",
                             body=(
                                 f"AI-generated proposal based on open issues in {selected_repo}. "
                                 "Please review and test before merging."

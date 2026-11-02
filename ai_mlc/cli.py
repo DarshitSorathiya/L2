@@ -150,7 +150,7 @@ def suggest_fix(
         repo=repo,
         file_path=file_path,
         new_content=new_content,
-        title="Suggested fix from Merge Wars",
+        title="Suggested fix from Repo Guide",
         body=f"AI-generated proposal based on open issues in {repo}. Please review and test before merging.",
         preview=preview,
         test_command=test_command,
@@ -161,7 +161,7 @@ def suggest_fix(
 def main() -> None:
     configure_logging()
     log_event("CLI started")
-    print("Welcome to Merge Wars. Type 'exit' to quit.")
+    print("Welcome to Repo Guide. Type 'exit' to quit.")
     defaults = prompt_for_default_repos()
     try:
         agent = setup_mcp_agent()

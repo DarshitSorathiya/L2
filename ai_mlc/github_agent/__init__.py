@@ -1,2 +1,2 @@
-"""GitHub agent utilities and integrations for Merge Wars."""
+"""GitHub agent utilities and integrations for Repo Guide."""
 

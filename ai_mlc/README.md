@@ -1,4 +1,4 @@
-# Merge Wars
+# Repo Guide
 
 From the repository root, install the pinned dependencies and configure credentials:
 

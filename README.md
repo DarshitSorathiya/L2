@@ -1,14 +1,14 @@
-# Merge Wars
+# Repo Guide
 
 ## Your AI-powered workspace for understanding GitHub repositories
 
-Merge Wars brings repository context, GitHub activity, and an AI assistant into one workflow. Ask questions in natural language, explore issues and pull requests with links to their sources, find relevant code, and turn a proposed fix into a pull request only after reviewing the diff and passing the repository's tests.
+Repo Guide brings repository context, GitHub activity, and an AI assistant into one workflow. Ask questions in natural language, explore issues and pull requests with links to their sources, find relevant code, and turn a proposed fix into a pull request only after reviewing the diff and passing the repository's tests.
 
 Use the interactive CLI when you want a focused, conversational workflow, or open the Streamlit app for a visual repository dashboard. Under the hood, a shared Haystack agent combines GitHub MCP tools, structured GitHub API data, and Google Gemini.
 
 **Less time jumping between tabs. More time understanding the work and deciding what to do next.**
 
-> Merge Wars assists with analysis and prepares proposed changes. It does not merge pull requests or replace code review, CI, or engineering judgment.
+> Repo Guide assists with analysis and prepares proposed changes. It does not merge pull requests or replace code review, CI, or engineering judgment.
 
 ## What you can do
 
@@ -31,7 +31,7 @@ Use the interactive CLI when you want a focused, conversational workflow, or ope
 
 ### Move from an idea to a reviewed pull request
 
-When you ask Merge Wars to analyze issues and suggest a fix, it can retrieve related issue and source context, prepare a proposed file change, and guide you through a safety-first PR workflow:
+When you ask Repo Guide to analyze issues and suggest a fix, it can retrieve related issue and source context, prepare a proposed file change, and guide you through a safety-first PR workflow:
 
 1. Fetch the target file from the repository's default branch.
 2. Display a unified diff for your review.
@@ -45,11 +45,11 @@ The workflow validates repository-relative paths and branch names, checks that t
 
 ## Choose your workflow
 
-| Interface | Best for |
-|---|---|
-| **CLI** | Conversational repository analysis, issue triage, and guided fix proposals from a terminal |
+| Interface         | Best for                                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------------------------- |
+| **CLI**           | Conversational repository analysis, issue triage, and guided fix proposals from a terminal            |
 | **Streamlit app** | Visual repository reports with filters, progress feedback, issue/PR links, and a diff-review workflow |
-| **MCP demo** | Trying the shared Haystack/GitHub MCP integration |
+| **MCP demo**      | Trying the shared Haystack/GitHub MCP integration                                                     |
 
 Supported repository inputs include `owner/repo` and GitHub repository URLs. Repository owner
 and name capitalization is preserved as entered, and duplicate matching is case-sensitive.
@@ -160,10 +160,10 @@ Configuration options and defaults are listed in [.env.example](.env.example). G
 
 Use a fine-grained token scoped to only the repositories you need.
 
-| Workflow | Suggested repository permissions |
-|---|---|
+| Workflow                                                                     | Suggested repository permissions                                  |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | Read repository metadata, issues, pull requests/reviews, source, and commits | Metadata: read; Issues: read; Pull requests: read; Contents: read |
-| Create a reviewed fix PR | Contents: read and write; Pull requests: read and write |
+| Create a reviewed fix PR                                                     | Contents: read and write; Pull requests: read and write           |
 
 The token is used for GitHub API calls and Git operations. `GITHUB_USERNAME` is not required. Grant write access only if you intend to use the PR workflow.
 
@@ -181,7 +181,7 @@ Structured reports use the GitHub API. Date filters apply to creation dates and 
 
 ## Project status and limitations
 
-Merge Wars is a developer-assistance project intended to help teams explore repositories and prepare proposed changes. Keep humans in the loop:
+Repo Guide is a developer-assistance project intended to help teams explore repositories and prepare proposed changes. Keep humans in the loop:
 
 - AI analysis can be incomplete or incorrect; validate it against the linked GitHub sources and code.
 - The PR workflow modifies one proposed file per change and does not merge the resulting PR.

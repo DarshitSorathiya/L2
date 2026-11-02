@@ -18,9 +18,11 @@ def _positive_int(name: str, value: str, minimum: int, maximum: int) -> int:
 class Settings:
     github_token: str = field(repr=False)
     google_api_key: str = field(repr=False)
+    groq_api_key: str = field(repr=False)
     use_docker_mcp: bool
     mcp_url: str
     gemini_model: str
+    groq_model: str
     api_timeout_seconds: int
     max_retries: int
     pr_test_timeout_seconds: int
@@ -37,14 +39,14 @@ class Settings:
         env = os.environ if environ is None else environ
         github_token = env.get("GITHUB_PERSONAL_ACCESS_TOKEN", "").strip()
         google_api_key = env.get("GOOGLE_API_KEY", "").strip()
+        groq_api_key = env.get("GROQ_API_KEY", "").strip()
         missing = [
             name
-            for name, value, required in (
-                ("GITHUB_PERSONAL_ACCESS_TOKEN", github_token, require_github),
-                ("GOOGLE_API_KEY", google_api_key, require_google),
-            )
-            if required and not value
+            for name, value in (("GITHUB_PERSONAL_ACCESS_TOKEN", github_token),)
+            if require_github and not value
         ]
+        if require_google and not google_api_key and not groq_api_key:
+            missing.append("GOOGLE_API_KEY or GROQ_API_KEY")
         if missing:
             raise RuntimeError(f"Missing required configuration: {', '.join(missing)}.")
 
@@ -59,13 +61,18 @@ class Settings:
         gemini_model = env.get("GEMINI_MODEL", "gemini-3.8-flash").strip()
         if not gemini_model:
             raise ValueError("GEMINI_MODEL cannot be empty.")
+        groq_model = env.get("GROQ_MODEL", "openai/gpt-oss-120b").strip()
+        if not groq_model:
+            raise ValueError("GROQ_MODEL cannot be empty.")
 
         return cls(
             github_token=github_token,
             google_api_key=google_api_key,
+            groq_api_key=groq_api_key,
             use_docker_mcp=docker_value in {"true", "1", "yes"},
             mcp_url=mcp_url,
             gemini_model=gemini_model,
+            groq_model=groq_model,
             api_timeout_seconds=_positive_int(
                 "GITHUB_API_TIMEOUT_SECONDS",
                 env.get("GITHUB_API_TIMEOUT_SECONDS", "30"),

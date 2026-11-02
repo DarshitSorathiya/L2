@@ -12,6 +12,7 @@ from urllib.parse import quote, urlparse
 
 import requests
 
+from ..observability import log_success
 from .config import Settings
 from .github_api import GitHubClient
 from .repositories import normalize_repo
@@ -29,14 +30,18 @@ class ChangePreview:
 
 def validate_file_path(file_path: str) -> PurePosixPath:
     if not file_path or "\0" in file_path or "\\" in file_path:
-        raise ValueError("Use a non-empty repository-relative path with forward slashes.")
+        raise ValueError(
+            "Use a non-empty repository-relative path with forward slashes."
+        )
 
     path = PurePosixPath(file_path)
-    if (
-        path.is_absolute()
-        or any(part in {"", ".", ".."} or part.lower() == ".git" for part in file_path.split("/"))
+    if path.is_absolute() or any(
+        part in {"", ".", ".."} or part.lower() == ".git"
+        for part in file_path.split("/")
     ):
-        raise ValueError("The target path must stay inside the repository and cannot target .git.")
+        raise ValueError(
+            "The target path must stay inside the repository and cannot target .git."
+        )
     return path
 
 
@@ -69,7 +74,9 @@ def validate_branch_name(branch_name: str) -> str:
     except FileNotFoundError as error:
         raise RuntimeError("Git must be installed and available on PATH.") from error
     if result.returncode:
-        raise ValueError("The base branch returned by GitHub is not a valid Git branch name.")
+        raise ValueError(
+            "The base branch returned by GitHub is not a valid Git branch name."
+        )
     return branch_name
 
 
@@ -83,7 +90,9 @@ def preview_file_change(repo: str, file_path: str, new_content: str) -> ChangePr
     repository_data = client._get(api_url).json()
     default_branch = repository_data.get("default_branch")
     if not default_branch:
-        raise RuntimeError(f"GitHub did not report a default branch for {normalized_repo}.")
+        raise RuntimeError(
+            f"GitHub did not report a default branch for {normalized_repo}."
+        )
     validate_branch_name(default_branch)
     contents_url = f"{api_url}/contents/{quote(relative_path.as_posix(), safe='/')}"
     response = client.session.get(
@@ -100,12 +109,20 @@ def preview_file_change(repo: str, file_path: str, new_content: str) -> ChangePr
         try:
             response.raise_for_status()
         except requests.RequestException as error:
-            raise RuntimeError(f"Could not fetch the file preview from GitHub: {error}") from error
+            raise RuntimeError(
+                f"Could not fetch the file preview from GitHub: {error}"
+            ) from error
         file_data = response.json()
         if not isinstance(file_data, dict) or file_data.get("type") != "file":
-            raise ValueError("The selected path is not a regular file in the base branch.")
-        if file_data.get("encoding") != "base64" or not isinstance(file_data.get("content"), str):
-            raise ValueError("GitHub did not return a supported text file representation.")
+            raise ValueError(
+                "The selected path is not a regular file in the base branch."
+            )
+        if file_data.get("encoding") != "base64" or not isinstance(
+            file_data.get("content"), str
+        ):
+            raise ValueError(
+                "GitHub did not return a supported text file representation."
+            )
         try:
             encoded_content = "".join(file_data["content"].split())
             original = base64.b64decode(encoded_content, validate=True).decode("utf-8")
@@ -192,10 +209,10 @@ def run_test_command(
     test_environment = os.environ.copy()
     for name in tuple(test_environment):
         upper_name = name.upper()
-        if (
-            any(secret in upper_name for secret in ("TOKEN", "API_KEY", "SECRET", "PASSWORD"))
-            or upper_name.startswith("GIT_CONFIG_")
-        ):
+        if any(
+            secret in upper_name
+            for secret in ("TOKEN", "API_KEY", "SECRET", "PASSWORD")
+        ) or upper_name.startswith("GIT_CONFIG_"):
             test_environment.pop(name)
     try:
         result = subprocess.run(
@@ -210,11 +227,17 @@ def run_test_command(
             check=False,
         )
     except FileNotFoundError as error:
-        raise RuntimeError(f"Could not start PR_TEST_COMMAND: {arguments[0]} was not found.") from error
+        raise RuntimeError(
+            f"Could not start PR_TEST_COMMAND: {arguments[0]} was not found."
+        ) from error
     except subprocess.TimeoutExpired as error:
-        raise RuntimeError(f"PR_TEST_COMMAND exceeded its {timeout_seconds}-second timeout.") from error
+        raise RuntimeError(
+            f"PR_TEST_COMMAND exceeded its {timeout_seconds}-second timeout."
+        ) from error
     if result.returncode:
-        output = "\n".join(part for part in (result.stdout, result.stderr) if part).strip()
+        output = "\n".join(
+            part for part in (result.stdout, result.stderr) if part
+        ).strip()
         raise RuntimeError(
             f"PR_TEST_COMMAND failed with exit code {result.returncode}:\n{output[-6000:]}"
         )
@@ -240,15 +263,20 @@ def create_pull_request(
     repository_data = client._get(api_url).json()
     default_branch = repository_data.get("default_branch")
     if not default_branch:
-        raise RuntimeError(f"GitHub did not report a default branch for {normalized_repo}.")
+        raise RuntimeError(
+            f"GitHub did not report a default branch for {normalized_repo}."
+        )
     validate_branch_name(default_branch)
     if preview and (
         preview.repo != normalized_repo
         or preview.file_path != relative_path.as_posix()
         or preview.base_branch != default_branch
-        or preview.proposed_sha != hashlib.sha256(new_content.encode("utf-8")).hexdigest()
+        or preview.proposed_sha
+        != hashlib.sha256(new_content.encode("utf-8")).hexdigest()
     ):
-        raise ValueError("The repository, file, content, or default branch changed after the diff preview.")
+        raise ValueError(
+            "The repository, file, content, or default branch changed after the diff preview."
+        )
 
     existing_branch_name = _branch_name(
         normalized_repo,
@@ -264,9 +292,10 @@ def create_pull_request(
     if existing_pull:
         return existing_pull
 
-    auth_value = "basic " + base64.b64encode(
-        f"x-access-token:{settings.github_token}".encode()
-    ).decode()
+    auth_value = (
+        "basic "
+        + base64.b64encode(f"x-access-token:{settings.github_token}".encode()).decode()
+    )
     git_env = os.environ.copy()
     git_env.update(
         {
@@ -308,9 +337,16 @@ def create_pull_request(
         if preview:
             if preview.base_sha is None:
                 if destination.exists():
-                    raise RuntimeError("The file was added after the diff preview; preview it again.")
-            elif not destination.is_file() or _git_blob_sha(destination.read_bytes()) != preview.base_sha:
-                raise RuntimeError("The file changed after the diff preview; preview it again.")
+                    raise RuntimeError(
+                        "The file was added after the diff preview; preview it again."
+                    )
+            elif (
+                not destination.is_file()
+                or _git_blob_sha(destination.read_bytes()) != preview.base_sha
+            ):
+                raise RuntimeError(
+                    "The file changed after the diff preview; preview it again."
+                )
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(new_content, encoding="utf-8")
 
@@ -347,6 +383,10 @@ def create_pull_request(
     try:
         pull_request_response.raise_for_status()
     except requests.RequestException as error:
-        raise RuntimeError(f"GitHub could not create the pull request: {error}") from error
+        raise RuntimeError(
+            f"GitHub could not create the pull request: {error}"
+        ) from error
     pull_request: Any = pull_request_response.json()
-    return _validate_pull_url(pull_request.get("html_url"), normalized_repo)
+    pull_request_url = _validate_pull_url(pull_request.get("html_url"), normalized_repo)
+    log_success(f"Pull request created for {normalized_repo}")
+    return pull_request_url

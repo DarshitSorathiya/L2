@@ -51,7 +51,10 @@ The workflow validates repository-relative paths and branch names, checks that t
 | **Streamlit app** | Visual repository reports with filters, progress feedback, issue/PR links, and a diff-review workflow |
 | **MCP demo** | Trying the shared Haystack/GitHub MCP integration |
 
-Supported repository inputs include `owner/repo` and GitHub repository URLs.
+Supported repository inputs include `owner/repo` and GitHub repository URLs. Repository owner
+and name capitalization is preserved as entered, and duplicate matching is case-sensitive.
+The CLI and Streamlit app show live progress through model-provider steps and GitHub tool calls; the
+Streamlit repository report also tracks metadata, issue, and pull-request retrieval separately.
 
 ## Quick start
 
@@ -60,7 +63,7 @@ Supported repository inputs include `owner/repo` and GitHub repository URLs.
 - Python 3.10 or later
 - Git
 - A GitHub personal access token
-- A Google Gemini API key
+- A Google Gemini API key or a Groq API key
 - Docker only if you choose the local Docker MCP server
 
 From the repository root, create an environment and install the pinned runtime dependencies:
@@ -72,7 +75,14 @@ python -m pip install -r ai_mlc\requirements.txt
 Copy-Item .env.example .env
 ```
 
-Edit `.env` and set `GITHUB_PERSONAL_ACCESS_TOKEN` and `GOOGLE_API_KEY`. The `.env` file is ignored by Git; do not commit credentials.
+Edit `.env` and set `GITHUB_PERSONAL_ACCESS_TOKEN` plus `GOOGLE_API_KEY` and/or `GROQ_API_KEY`.
+When both model keys are configured, Gemini is used first and Groq automatically takes over
+if Gemini returns an API error. With only `GROQ_API_KEY`, Groq is used directly. Get a Groq
+key from [Groq Console](https://console.groq.com/keys); free usage is subject to Groq's current
+account limits and model availability. The default Groq model is `openai/gpt-oss-120b`; if you
+already have an older `GROQ_MODEL` setting in `.env`, update it to an active model from
+[Groq's model list](https://console.groq.com/docs/models). The `.env` file is ignored by Git;
+do not commit credentials.
 
 Start the interface you want:
 
@@ -89,13 +99,40 @@ python -m ai_mlc.mcp_demo_haystack
 
 The hosted GitHub MCP endpoint is used by default. To run the local MCP server through Docker, set `USE_DOCKER_MCP=true`.
 
+The assistant can explore any public GitHub repository, including open-source projects
+you do not own, as well as private repositories your configured GitHub account can access.
+Provide a repository as `owner/repo` or a GitHub URL and ask about its code, issues, pull
+requests, commits, or metadata. Ownership is not required for public repositories. For
+requests unrelated to GitHub repositories or related software engineering, it briefly
+declines rather than answering or calling GitHub tools.
+
+Errors shown in the CLI and Streamlit app are kept concise and user-friendly. Detailed
+diagnostics and successful operation events are appended to `merge_wars.log` in the
+repository root; known API keys and tokens are redacted.
+
 ### If the MCP connection fails
 
 If the CLI reports that it cannot connect to `api.githubcopilot.com`, the hosted MCP server is unreachable from your current network. Check that outbound HTTPS is allowed and review any firewall or proxy settings. Alternatively, set `USE_DOCKER_MCP=true` in `.env` and run with Docker Desktop available; Docker must be able to access the GitHub MCP server image if it is not already present locally. Restart the CLI after changing `.env`.
 
 ### If Gemini returns 403 `project-unavailable`
 
-The Google Cloud project associated with `GOOGLE_API_KEY` cannot use the Gemini API free tier. Enable Gemini API billing for that project in [Google AI Studio billing](https://aistudio.google.com/billing), or use an API key from a project with billing enabled. If billing is already enabled, verify that the key belongs to that project. This is separate from GitHub token permissions and MCP connectivity.
+The Google Cloud project associated with `GOOGLE_API_KEY` cannot use the Gemini API free tier.
+Set `GROQ_API_KEY` in `.env` to automatically switch to Groq on Gemini API errors, or use a
+Google key from a project with free-tier access. This is separate from GitHub token permissions
+and MCP connectivity.
+
+### If Gemini returns 503 `UNAVAILABLE`
+
+Gemini may temporarily reject requests when a model is under high demand. If `GROQ_API_KEY` is
+configured, the assistant automatically switches to Groq. Otherwise it retries these responses
+with increasing delays, up to `GITHUB_MAX_RETRIES` (default: 2).
+
+### If Groq returns 429 `RateLimitError`
+
+Groq free/on-demand usage has token-per-minute limits. The assistant honors the wait suggested
+by Groq and retries up to `GITHUB_MAX_RETRIES`. If the limit persists, wait the indicated time,
+start a new conversation, or shorten the question to reduce the conversation and tool-result
+context sent to the model.
 
 ### Example requests
 

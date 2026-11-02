@@ -11,10 +11,10 @@ from ai_mlc.github_agent.repositories import (
 
 class RepositoryTests(unittest.TestCase):
     def test_normalizes_repository_names_and_urls(self) -> None:
-        self.assertEqual(normalize_repo("  Owner/Project.Name  "), "owner/project.name")
+        self.assertEqual(normalize_repo("  Owner/Project.Name  "), "Owner/Project.Name")
         self.assertEqual(
             normalize_repo("https://github.com/Owner/Project.git"),
-            "owner/project",
+            "Owner/Project",
         )
         self.assertIsNone(normalize_repo("https://example.com/owner/project"))
         self.assertIsNone(normalize_repo("owner/.."))
@@ -22,13 +22,19 @@ class RepositoryTests(unittest.TestCase):
     def test_normalizes_multiple_repositories_without_duplicates(self) -> None:
         self.assertEqual(
             normalize_repos("Owner/Repo, owner/repo\nhttps://github.com/other/project"),
-            ["owner/repo", "other/project"],
+            ["Owner/Repo", "owner/repo", "other/project"],
         )
 
     def test_extracts_repositories_from_a_query(self) -> None:
         self.assertEqual(
-            extract_repos("Compare https://github.com/owner/repo with other/project"),
-            ["owner/repo", "other/project"],
+            extract_repos("Compare https://github.com/Owner/Repo with other/project"),
+            ["Owner/Repo", "other/project"],
+        )
+
+    def test_preserves_owner_case_and_deduplicates_case_sensitively(self) -> None:
+        self.assertEqual(
+            normalize_repos("DarshitSorathiya/TransitOps, darshitsorathiya/transitops"),
+            ["DarshitSorathiya/TransitOps", "darshitsorathiya/transitops"],
         )
 
     def test_infers_supported_intents(self) -> None:

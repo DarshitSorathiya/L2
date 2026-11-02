@@ -4,12 +4,49 @@ from typing import Any, Callable
 
 from dotenv import load_dotenv
 
-from ai_mlc.github_agent.agent import agent_fetch, setup_mcp_agent
+from ai_mlc.github_agent.agent import AgentProgress, agent_fetch, setup_mcp_agent
 from ai_mlc.github_agent.llm_gemini import gemini_chat
 from ai_mlc.github_agent.pr_workflow import create_pull_request, preview_file_change
-from ai_mlc.github_agent.repositories import extract_repos, infer_intent, normalize_repos
+from ai_mlc.github_agent.repositories import (
+    extract_repos,
+    infer_intent,
+    normalize_repos,
+)
+from ai_mlc.observability import (
+    LOG_PATH,
+    configure_logging,
+    friendly_error_message,
+    log_event,
+    report_error,
+)
 
 load_dotenv()
+
+
+def _console_progress() -> Callable[[AgentProgress], None]:
+    updates = 0
+    width = 20
+
+    def report(event: AgentProgress) -> None:
+        nonlocal updates
+        if event.phase == "completed":
+            updates = width
+        elif event.phase not in {"starting", "failed"}:
+            updates += 1
+        filled = min(updates, width)
+        bar = "#" * filled + "-" * (width - filled)
+        step = f"Step {event.step}: " if event.step else ""
+        message = event.message
+        if event.phase == "failed":
+            message = (
+                f"{friendly_error_message(RuntimeError(message))} "
+                f"(See {LOG_PATH.name} for details.)"
+            )
+        print(f"\r[{bar}] {step}{message}", end="", flush=True)
+        if event.phase in {"completed", "failed"}:
+            print()
+
+    return report
 
 
 def prompt_for_default_repos() -> list[str]:
@@ -30,7 +67,9 @@ def prompt_for_default_repos() -> list[str]:
 def get_repositories(query: str, defaults: list[str]) -> list[str]:
     repos = extract_repos(query) or defaults
     while not repos:
-        repos = normalize_repos(input("Enter a repository (owner/repo or GitHub URL): "))
+        repos = normalize_repos(
+            input("Enter a repository (owner/repo or GitHub URL): ")
+        )
         if not repos:
             print("No valid repository found. Example: octocat/Hello-World")
     return repos
@@ -66,7 +105,9 @@ def suggest_fix(
             "then use get_file_contents for the most relevant file. Return only file paths "
             "and the relevant source lines; if no relevant code is found, say so.",
         )
-        issues.append(f"=== {repo} issues ===\n{issue_report}\n=== Source context ===\n{code_context}")
+        issues.append(
+            f"=== {repo} issues ===\n{issue_report}\n=== Source context ===\n{code_context}"
+        )
     response = gemini_chat(
         "Analyze these real GitHub issues and suggest a prioritized fix. "
         "Do not invent repository files or claim a fix is verified. "
@@ -96,7 +137,9 @@ def suggest_fix(
         print("PR creation cancelled: a test command is required.")
         return
     print(f"Tests to run before pushing: {test_command}")
-    if input("Run these tests and create a PR with this exact diff? [y/N] ").strip().lower() not in {
+    if input(
+        "Run these tests and create a PR with this exact diff? [y/N] "
+    ).strip().lower() not in {
         "y",
         "yes",
     }:
@@ -116,17 +159,27 @@ def suggest_fix(
 
 
 def main() -> None:
+    configure_logging()
+    log_event("CLI started")
     print("Welcome to Merge Wars. Type 'exit' to quit.")
     defaults = prompt_for_default_repos()
     try:
         agent = setup_mcp_agent()
+        log_event("GitHub assistant initialized")
     except Exception as error:
-        print(f"Could not initialize the GitHub assistant: {error}")
+        print(
+            f"Could not initialize the GitHub assistant. {report_error('Assistant initialization failed', error)}"
+        )
         return
     histories: dict[str, list[Any]] = {}
 
     def fetch(repo: str, prompt: str) -> str:
-        return agent_fetch(agent, prompt, history=histories.setdefault(repo, []))
+        return agent_fetch(
+            agent,
+            prompt,
+            history=histories.setdefault(repo, []),
+            progress_callback=_console_progress(),
+        )
 
     while True:
         query = input("\nAsk about GitHub: ").strip()
@@ -152,13 +205,17 @@ def main() -> None:
                                 f"Question: {query}",
                             )
                         )
-                    except (RuntimeError, ValueError) as error:
-                        print(f"GitHub request failed for {repo}: {error}")
+                    except Exception as error:
+                        print(
+                            f"GitHub request failed for {repo}. {report_error('GitHub request failed', error)}"
+                        )
             else:
                 try:
                     print(gemini_chat(query))
                 except Exception as error:
-                    print(f"Gemini request failed: {error}")
+                    print(
+                        f"AI request failed. {report_error('AI chat request failed', error)}"
+                    )
             continue
 
         repos = get_repositories(query, defaults)
@@ -166,7 +223,9 @@ def main() -> None:
             try:
                 suggest_fix(repos, fetch, query)
             except Exception as error:
-                print(f"GitHub analysis or PR workflow failed: {error}")
+                print(
+                    f"GitHub analysis or PR workflow failed. {report_error('Analysis or PR workflow failed', error)}"
+                )
             continue
 
         for repo in repos:
@@ -197,8 +256,12 @@ def main() -> None:
                 )
             try:
                 print(fetch(repo, prompt))
-            except (RuntimeError, ValueError) as error:
-                print(f"GitHub request failed for {repo}: {error}")
+            except Exception as error:
+                print(
+                    f"GitHub request failed for {repo}. {report_error('GitHub request failed', error)}"
+                )
+
+    log_event("CLI stopped")
 
 
 if __name__ == "__main__":

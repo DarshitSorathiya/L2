@@ -26,7 +26,7 @@ def normalize_repo(text: str | None) -> str | None:
     owner, repository = candidate.split("/", maxsplit=1)
     if repository in {".", ".."}:
         return None
-    return f"{owner.lower()}/{repository.lower()}"
+    return f"{owner}/{repository}"
 
 
 def normalize_repos(multi_text: str | None) -> list[str]:
@@ -37,7 +37,9 @@ def normalize_repos(multi_text: str | None) -> list[str]:
     seen: set[str] = set()
     for part in re.split(r"[\n,]", multi_text):
         repo = normalize_repo(part)
-        if repo and repo not in seen:
+        if repo is None:
+            continue
+        if repo not in seen:
             repos.append(repo)
             seen.add(repo)
     return repos
@@ -48,13 +50,17 @@ def extract_repos(text: str) -> list[str]:
     seen: set[str] = set()
     for match in _URL_PATTERN.finditer(text):
         repo = normalize_repo(match.group(0))
-        if repo and repo not in seen:
+        if repo is None:
+            continue
+        if repo not in seen:
             repos.append(repo)
             seen.add(repo)
     remaining_text = _URL_PATTERN.sub(" ", text)
     for match in _REPO_IN_TEXT_PATTERN.finditer(remaining_text):
         repo = normalize_repo(match.group(1))
-        if repo and repo not in seen:
+        if repo is None:
+            continue
+        if repo not in seen:
             repos.append(repo)
             seen.add(repo)
     return repos

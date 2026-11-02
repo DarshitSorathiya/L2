@@ -6,6 +6,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from ..observability import log_event, log_error
 from .config import Settings
 from .repositories import normalize_repo
 
@@ -116,14 +117,18 @@ class GitHubClient:
         try:
             response = self.session.get(url, timeout=self.timeout, **kwargs)
             response.raise_for_status()
+            log_event("GitHub API request completed", f"GET {url}")
             return response
         except requests.RequestException as error:
+            log_error("GitHub API request failed", error)
             raise RuntimeError(f"GitHub API request failed: {error}") from error
 
     @staticmethod
     def _items(response: requests.Response) -> list[dict[str, Any]]:
         data = response.json()
-        if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
+        if not isinstance(data, list) or not all(
+            isinstance(item, dict) for item in data
+        ):
             raise RuntimeError("GitHub API returned an unexpected list response.")
         return data
 
@@ -157,7 +162,9 @@ class GitHubClient:
             "created_at": data.get("created_at"),
             "updated_at": data.get("updated_at"),
             "pushed_at": data.get("pushed_at"),
-            "license": license_data.get("spdx_id") if isinstance(license_data, dict) else None,
+            "license": license_data.get("spdx_id")
+            if isinstance(license_data, dict)
+            else None,
         }
 
     def issues(
@@ -182,7 +189,9 @@ class GitHubClient:
             f"{self._repo_url(repo)}/issues",
             params={"state": state, "page": page, "per_page": per_page},
         )
-        selected_labels = {label.strip().casefold() for label in labels.split(",") if label.strip()}
+        selected_labels = {
+            label.strip().casefold() for label in labels.split(",") if label.strip()
+        }
         items = []
         for item in self._items(response):
             if "pull_request" in item or not _matches_filters(
@@ -238,16 +247,26 @@ class GitHubClient:
         base_url = self._repo_url(repo)
         response = self._get(
             f"{base_url}/pulls",
-            params={"state": state, "page": page, "per_page": per_page, "sort": "created", "direction": "desc"},
+            params={
+                "state": state,
+                "page": page,
+                "per_page": per_page,
+                "sort": "created",
+                "direction": "desc",
+            },
         )
-        selected_labels = {label.strip().casefold() for label in labels.split(",") if label.strip()}
+        selected_labels = {
+            label.strip().casefold() for label in labels.split(",") if label.strip()
+        }
         items = []
         for item in self._items(response):
             if not _matches_filters(item, selected_labels, since_date, until_date):
                 continue
             number = item.get("number")
             if not isinstance(number, int) or number < 1:
-                raise RuntimeError("GitHub returned a pull request without a valid number.")
+                raise RuntimeError(
+                    "GitHub returned a pull request without a valid number."
+                )
             reviews_response = self._get(
                 f"{base_url}/pulls/{number}/reviews",
                 params={"page": 1, "per_page": 100},
@@ -278,7 +297,9 @@ class GitHubClient:
                     "author": (item.get("user") or {}).get("login"),
                     "head": (item.get("head") or {}).get("ref"),
                     "base": (item.get("base") or {}).get("ref"),
-                    "review_summary": self._review_summary(reviews, requested_reviewers),
+                    "review_summary": self._review_summary(
+                        reviews, requested_reviewers
+                    ),
                     "reviews": reviews,
                     "reviews_pagination": self._pagination(reviews_response, 1, 100),
                 }
@@ -296,7 +317,9 @@ class GitHubClient:
         }
 
     @staticmethod
-    def _pagination(response: requests.Response, page: int, per_page: int) -> dict[str, Any]:
+    def _pagination(
+        response: requests.Response, page: int, per_page: int
+    ) -> dict[str, Any]:
         next_link = response.links.get("next")
         return {
             "page": page,
@@ -323,7 +346,9 @@ class GitHubClient:
             for reviewer in requested_reviewers
             if reviewer.get("login")
         ]
-        has_pending_reviewer = any(name not in latest_by_reviewer for name in requested_names)
+        has_pending_reviewer = any(
+            name not in latest_by_reviewer for name in requested_names
+        )
         if "CHANGES_REQUESTED" in states:
             status = "changes_requested"
         elif has_pending_reviewer:

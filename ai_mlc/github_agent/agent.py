@@ -10,6 +10,18 @@ from .config import Settings
 LOGGER = logging.getLogger(__name__)
 
 
+def _remove_mcp_header_extensions(schema: Any) -> Any:
+    if isinstance(schema, dict):
+        return {
+            key: _remove_mcp_header_extensions(value)
+            for key, value in schema.items()
+            if key != "x-mcp-header"
+        }
+    if isinstance(schema, list):
+        return [_remove_mcp_header_extensions(value) for value in schema]
+    return schema
+
+
 def setup_mcp_agent(use_docker: bool | None = None) -> Any:
     settings = Settings.from_env()
     if use_docker is None:
@@ -26,6 +38,11 @@ def setup_mcp_agent(use_docker: bool | None = None) -> Any:
     from haystack.utils import Secret
     from haystack_integrations.components.generators.google_genai import GoogleGenAIChatGenerator
     from haystack_integrations.tools.mcp import MCPTool, StdioServerInfo, StreamableHttpServerInfo
+
+    class GeminiCompatibleMCPTool(MCPTool):
+        def warm_up(self) -> None:
+            super().warm_up()
+            self.parameters = _remove_mcp_header_extensions(self.parameters)
 
     if use_docker:
         server = StdioServerInfo(
@@ -47,7 +64,7 @@ def setup_mcp_agent(use_docker: bool | None = None) -> Any:
         )
 
     tools: list[Any] = [
-        MCPTool(
+        GeminiCompatibleMCPTool(
             name=tool_name,
             server_info=server,
             connection_timeout=settings.api_timeout_seconds,

@@ -129,7 +129,9 @@ The token is used for GitHub API calls and Git operations. `GITHUB_USERNAME` is 
 ## How it works
 
 - **Haystack agent:** shared by the CLI and Streamlit app; routes requests to MCP and structured GitHub tools.
-- **GitHub MCP:** repository and activity exploration, source search, and file retrieval.
+- **GitHub MCP:** repository and activity exploration, source search, and file retrieval. MCP-only
+  `x-mcp-header` schema annotations are removed before tool schemas are sent to Gemini; tool input
+  fields remain unchanged.
 - **Structured GitHub API tools:** repository metadata, filtered/paginated issue and pull-request data, review summaries, and linked reports.
 - **Google Gemini:** conversational reasoning over retrieved repository context.
 - **PR workflow:** diff preview, explicit approval, path and stale-preview validation, test gate, deterministic branch, and predictable repeat handling.

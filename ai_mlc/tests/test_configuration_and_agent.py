@@ -3,7 +3,11 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from ai_mlc.github_agent.agent import agent_fetch, setup_mcp_agent
+from ai_mlc.github_agent.agent import (
+    _remove_mcp_header_extensions,
+    agent_fetch,
+    setup_mcp_agent,
+)
 from ai_mlc.github_agent.config import Settings
 from ai_mlc.github_agent.github_api import GitHubClient
 
@@ -59,6 +63,37 @@ class ConfigurationTests(unittest.TestCase):
 
 
 class AgentTests(unittest.TestCase):
+    def test_removes_mcp_header_extensions_recursively(self) -> None:
+        schema = {
+            "type": "object",
+            "properties": {
+                "owner": {"type": "string", "x-mcp-header": "owner"},
+                "nested": {
+                    "type": "object",
+                    "properties": {
+                        "repo": {"type": "string", "x-mcp-header": "repo"},
+                    },
+                },
+            },
+            "required": ["owner"],
+        }
+
+        self.assertEqual(
+            _remove_mcp_header_extensions(schema),
+            {
+                "type": "object",
+                "properties": {
+                    "owner": {"type": "string"},
+                    "nested": {
+                        "type": "object",
+                        "properties": {"repo": {"type": "string"}},
+                    },
+                },
+                "required": ["owner"],
+            },
+        )
+        self.assertIn("x-mcp-header", schema["properties"]["owner"])
+
     def test_docker_mode_reports_missing_docker_cli_during_setup(self) -> None:
         with (
             patch.dict(os.environ, _VALID_ENV, clear=True),
@@ -71,12 +106,25 @@ class AgentTests(unittest.TestCase):
             setup_mcp_agent(use_docker=True)
 
     def test_agent_registers_mcp_and_structured_github_tools(self) -> None:
+        class FakeMCPTool:
+            def __init__(self, name: str, **_: object) -> None:
+                self.name = name
+                self.parameters: dict[str, object] = {}
+
+            def warm_up(self) -> None:
+                self.parameters = {
+                    "type": "object",
+                    "properties": {
+                        "owner": {"type": "string", "x-mcp-header": "owner"},
+                    },
+                }
+
         with (
             patch.dict(os.environ, _VALID_ENV, clear=True),
             patch(
                 "haystack_integrations.tools.mcp.MCPTool",
-                side_effect=lambda name, **_: SimpleNamespace(name=name),
-            ) as mcp_tool,
+                FakeMCPTool,
+            ),
             patch("haystack.components.agents.Agent") as agent_class,
             patch(
                 "haystack_integrations.components.generators.google_genai.GoogleGenAIChatGenerator"
@@ -85,7 +133,6 @@ class AgentTests(unittest.TestCase):
         ):
             setup_mcp_agent()
 
-        self.assertEqual(mcp_tool.call_count, 5)
         registered_tools = agent_class.call_args.kwargs["tools"]
         names = {tool.name for tool in registered_tools}
         self.assertTrue(
@@ -101,6 +148,11 @@ class AgentTests(unittest.TestCase):
                 "summarize_github_repository",
             }.issubset(names)
         )
+        mcp_tools = [tool for tool in registered_tools if isinstance(tool, FakeMCPTool)]
+        self.assertEqual(len(mcp_tools), 5)
+        for tool in mcp_tools:
+            tool.warm_up()
+            self.assertEqual(tool.parameters, _remove_mcp_header_extensions(tool.parameters))
         self.assertEqual(len(names), 9)
         self.assertNotIn("list_discussions", names)
 
